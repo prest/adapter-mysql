@@ -1,7 +1,8 @@
 # MySQL Adapter to pRest project https://postgres.rest/
 
-[ ] Not Implemented
-[X] Implemented
+- [ ] Not Implemented
+- [X] Implemented
+
 [-] Not Applicable
 
 ## Select - GET
