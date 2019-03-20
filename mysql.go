@@ -548,9 +548,9 @@ func (adapter *MySQL) OrderByRequest(r *http.Request) (values string, err error)
 				return
 			}
 			f := strings.Split(field, ".")
-			field = fmt.Sprintf(`"%s"`, strings.Join(f, `"."`))
-			if strings.HasPrefix(field, `"-`) {
-				field = strings.Replace(field, `"-`, `"`, 1)
+			field = fmt.Sprintf(`%s`, strings.Join(f, `"."`))
+			if strings.HasPrefix(field, `-`) {
+				field = strings.Replace(field, `-`, ``, 1)
 				field = fmt.Sprintf(`%s DESC`, field)
 			}
 

@@ -21,6 +21,11 @@ Select operations over a TABLE
 Join
 - [X] /DATABASE/SCHEMA/Table?_join=Type:Table2:Table.field:Operator:Table2.field
 
+ORDER BY
+- [X] /DATABASE/SCHEMA/TABLE/?_order=fieldname (ASC)
+- [X] /DATABASE/SCHEMA/TABLE/?_order=-fieldname (DESC)
+- [X] /DATABASE/SCHEMA/TABLE/?_order=fieldname01,-fieldname02,fieldname03 (Multiple Orders)
+
 Select operations over a VIEW
 - [X] /DATABASE/SCHEMA/TABLE (show all rows, find by database and VIEW)
 - [X] /DATABASE/SCHEMA/VIEW?_select=column (select statement by columns in VIEW)
@@ -44,7 +49,7 @@ Database structure
 - [ ] /DATABASE/SCHEMA?_renderer=xml (JSON by default)
 
 ## Insert - POST
-- [X]/DATABASE/SCHEMA/TABLE
+- [X] /DATABASE/SCHEMA/TABLE
 ```json
 {
     "FIELD1": "string value",
