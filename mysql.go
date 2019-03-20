@@ -466,6 +466,8 @@ func (adapter *MySQL) JoinByRequest(r *http.Request) (values []string, err error
 
 	joinArgs := strings.Split(queries.Get("_join"), ":")
 
+	fmt.Println(joinArgs)
+
 	if len(joinArgs) != 5 {
 		err = errors.New("Invalid number of arguments in join statement")
 		return
@@ -494,7 +496,7 @@ func (adapter *MySQL) JoinByRequest(r *http.Request) (values []string, err error
 		err = errJoin
 		return
 	}
-	joinQuery := fmt.Sprintf(` %s JOIN "%s" ON "%s"."%s" %s "%s"."%s" `, strings.ToUpper(joinArgs[0]), joinArgs[1], spl[0], spl[1], op, splj[0], splj[1])
+	joinQuery := fmt.Sprintf(` %s JOIN %s ON %s.%s %s %s.%s `, strings.ToUpper(joinArgs[0]), joinArgs[1], spl[0], spl[1], op, splj[0], splj[1])
 	values = append(values, joinQuery)
 	return
 }
@@ -516,10 +518,12 @@ func (adapter *MySQL) SelectFields(fields []string) (sql string, err error) {
 
 			isFunction, _ := regexp.MatchString(groupRegex.String(), field)
 			if isFunction {
+				field = strings.Replace(field, `"`, ``, -1)
+				f = strings.Split(field, ".")
 				aux = append(aux, strings.Join(f, `.`))
 				continue
 			}
-			aux = append(aux, fmt.Sprintf(`"%s"`, strings.Join(f, `"."`)))
+			aux = append(aux, fmt.Sprintf(`%s`, strings.Join(f, `.`)))
 			continue
 		}
 		aux = append(aux, `*`)
@@ -663,7 +667,8 @@ func (adapter *MySQL) PaginateIfPossible(r *http.Request) (paginatedQuery string
 			return
 		}
 	}
-	paginatedQuery = fmt.Sprintf("LIMIT %d OFFSET(%d - 1) * %d", pageSize, pageNumber, pageSize)
+	pageOffset := (pageNumber - 1) * pageSize
+	paginatedQuery = fmt.Sprintf("LIMIT %d OFFSET %d", pageSize, pageOffset)
 	return
 }
 
