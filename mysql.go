@@ -1,4 +1,4 @@
-package postgres
+package mysql
 
 import (
 	"bytes"
@@ -15,20 +15,18 @@ import (
 	"sync"
 	"unicode"
 
-	"github.com/lib/pq"
-
 	"github.com/jmoiron/sqlx"
+	"github.com/joelmdesouza/mysql/formatters"
+	"github.com/joelmdesouza/mysql/internal/connection"
+	"github.com/joelmdesouza/mysql/statements"
 	"github.com/nuveo/log"
 	"github.com/prest/adapters"
-	"github.com/prest/adapters/postgres/formatters"
-	"github.com/prest/adapters/postgres/internal/connection"
-	"github.com/prest/adapters/postgres/statements"
 	"github.com/prest/adapters/scanner"
 	"github.com/prest/config"
 )
 
-//Postgres adapter postgresql
-type Postgres struct {
+//MySQL adapter mysql
+type MySQL struct {
 }
 
 const (
@@ -82,9 +80,9 @@ func (s *Stmt) Prepare(db *sqlx.DB, tx *sql.Tx, SQL string) (statement *sql.Stmt
 	return
 }
 
-// Load postgres
+// Load mysql
 func Load() {
-	config.PrestConf.Adapter = &Postgres{}
+	config.PrestConf.Adapter = &MySQL{}
 	db, err := connection.Get()
 	if err != nil {
 		log.Fatal(err)
@@ -122,7 +120,7 @@ func ClearStmt() {
 }
 
 // GetTransaction get transaction
-func (adapter *Postgres) GetTransaction() (tx *sql.Tx, err error) {
+func (adapter *MySQL) GetTransaction() (tx *sql.Tx, err error) {
 	db, err := connection.Get()
 	if err != nil {
 		log.Println(err)
@@ -177,7 +175,7 @@ func chkInvalidIdentifier(identifer ...string) bool {
 }
 
 // WhereByRequest create interface for queries + where
-func (adapter *Postgres) WhereByRequest(r *http.Request, initialPlaceholderID int) (whereSyntax string, values []interface{}, err error) {
+func (adapter *MySQL) WhereByRequest(r *http.Request, initialPlaceholderID int) (whereSyntax string, values []interface{}, err error) {
 	whereKey := []string{}
 	whereValues := []string{}
 	var value, op string
@@ -202,6 +200,7 @@ func (adapter *Postgres) WhereByRequest(r *http.Request, initialPlaceholderID in
 				keyInfo := strings.Split(key, ":")
 
 				if len(keyInfo) > 1 {
+					/* jsonb not implemented
 					switch keyInfo[1] {
 					case "jsonb":
 						jsonField := strings.Split(keyInfo[0], "->>")
@@ -219,6 +218,11 @@ func (adapter *Postgres) WhereByRequest(r *http.Request, initialPlaceholderID in
 							return
 						}
 					}
+					*/
+					if chkInvalidIdentifier(keyInfo[0]) {
+						err = fmt.Errorf("invalid identifier: %s", keyInfo[0])
+						return
+					}
 					pid++
 					continue
 				}
@@ -230,7 +234,7 @@ func (adapter *Postgres) WhereByRequest(r *http.Request, initialPlaceholderID in
 
 				if k == 0 {
 					fields := strings.Split(key, ".")
-					key = fmt.Sprintf(`"%s"`, strings.Join(fields, `"."`))
+					key = fmt.Sprintf(`%s`, strings.Join(fields, `"."`))
 				}
 
 				switch op {
@@ -250,7 +254,7 @@ func (adapter *Postgres) WhereByRequest(r *http.Request, initialPlaceholderID in
 				case "IS NULL", "IS NOT NULL", "IS TRUE", "IS NOT TRUE", "IS FALSE", "IS NOT FALSE":
 					whereKey = append(whereKey, fmt.Sprintf(`%s %s`, key, op))
 				default: // "=", "!=", ">", ">=", "<", "<="
-					whereKey = append(whereKey, fmt.Sprintf(`%s %s $%d`, key, op, pid))
+					whereKey = append(whereKey, fmt.Sprintf(`%s %s ?`, key, op))
 					whereValues = append(whereValues, value)
 					pid++
 				}
@@ -273,7 +277,7 @@ func (adapter *Postgres) WhereByRequest(r *http.Request, initialPlaceholderID in
 }
 
 // ReturningByRequest create interface for queries + returning
-func (adapter *Postgres) ReturningByRequest(r *http.Request) (returningSyntax string, err error) {
+func (adapter *MySQL) ReturningByRequest(r *http.Request) (returningSyntax string, err error) {
 	queries := r.URL.Query()["_returning"]
 	if len(queries) > 0 {
 		for i, q := range queries {
@@ -287,7 +291,7 @@ func (adapter *Postgres) ReturningByRequest(r *http.Request) (returningSyntax st
 }
 
 // SetByRequest create a set clause for SQL
-func (adapter *Postgres) SetByRequest(r *http.Request, initialPlaceholderID int) (setSyntax string, values []interface{}, err error) {
+func (adapter *MySQL) SetByRequest(r *http.Request, initialPlaceholderID int) (setSyntax string, values []interface{}, err error) {
 	body := make(map[string]interface{})
 	if err = json.NewDecoder(r.Body).Decode(&body); err != nil {
 		return
@@ -306,8 +310,8 @@ func (adapter *Postgres) SetByRequest(r *http.Request, initialPlaceholderID int)
 			return
 		}
 		keys := strings.Split(key, ".")
-		key = fmt.Sprintf(`"%s"`, strings.Join(keys, `"."`))
-		fields = append(fields, fmt.Sprintf(`%s=$%d`, key, initialPlaceholderID))
+		key = fmt.Sprintf(`%s`, strings.Join(keys, `"."`))
+		fields = append(fields, fmt.Sprintf(`%s=?`, key))
 
 		switch value.(type) {
 		case []interface{}:
@@ -330,7 +334,7 @@ func closer(body io.Closer) {
 }
 
 // ParseBatchInsertRequest create insert SQL to batch request
-func (adapter *Postgres) ParseBatchInsertRequest(r *http.Request) (colsName string, placeholders string, values []interface{}, err error) {
+func (adapter *MySQL) ParseBatchInsertRequest(r *http.Request) (colsName string, placeholders string, values []interface{}, err error) {
 	recordSet := make([]map[string]interface{}, 0)
 	if err = json.NewDecoder(r.Body).Decode(&recordSet); err != nil {
 		return
@@ -346,7 +350,7 @@ func (adapter *Postgres) ParseBatchInsertRequest(r *http.Request) (colsName stri
 	return
 }
 
-func (adapter *Postgres) operationValues(recordSet []map[string]interface{}, recordKeys []string) (values []interface{}, placeholders string, err error) {
+func (adapter *MySQL) operationValues(recordSet []map[string]interface{}, recordKeys []string) (values []interface{}, placeholders string, err error) {
 	for i, record := range recordSet {
 		initPH := len(values) + 1
 		for _, key := range recordKeys {
@@ -371,7 +375,7 @@ func (adapter *Postgres) operationValues(recordSet []map[string]interface{}, rec
 	return
 }
 
-func (adapter *Postgres) tableKeys(json map[string]interface{}) (keys []string) {
+func (adapter *MySQL) tableKeys(json map[string]interface{}) (keys []string) {
 	for key := range json {
 		keys = append(keys, strconv.Quote(key))
 	}
@@ -379,19 +383,19 @@ func (adapter *Postgres) tableKeys(json map[string]interface{}) (keys []string) 
 	return
 }
 
-func (adapter *Postgres) createPlaceholders(initial, lenValues int) (ret string) {
+func (adapter *MySQL) createPlaceholders(initial, lenValues int) (ret string) {
 	for i := initial; i <= lenValues; i++ {
 		if ret != "" {
 			ret += ","
 		}
-		ret += fmt.Sprintf("$%d", i)
+		ret += "?"
 	}
 	ret = fmt.Sprintf("(%s)", ret)
 	return
 }
 
 // ParseInsertRequest create insert SQL
-func (adapter *Postgres) ParseInsertRequest(r *http.Request) (colsName string, colsValue string, values []interface{}, err error) {
+func (adapter *MySQL) ParseInsertRequest(r *http.Request) (colsName string, colsValue string, values []interface{}, err error) {
 	body := make(map[string]interface{})
 	if err = json.NewDecoder(r.Body).Decode(&body); err != nil {
 		return
@@ -409,7 +413,7 @@ func (adapter *Postgres) ParseInsertRequest(r *http.Request) (colsName string, c
 			err = errors.New("Insert: Invalid identifier")
 			return
 		}
-		fields = append(fields, fmt.Sprintf(`"%s"`, key))
+		fields = append(fields, fmt.Sprintf(`%s`, key))
 
 		switch value.(type) {
 		case []interface{}:
@@ -425,7 +429,7 @@ func (adapter *Postgres) ParseInsertRequest(r *http.Request) (colsName string, c
 }
 
 // DatabaseClause return a SELECT `query`
-func (adapter *Postgres) DatabaseClause(req *http.Request) (query string, hasCount bool) {
+func (adapter *MySQL) DatabaseClause(req *http.Request) (query string, hasCount bool) {
 	queries := req.URL.Query()
 	countQuery := queries.Get("_count")
 
@@ -439,7 +443,7 @@ func (adapter *Postgres) DatabaseClause(req *http.Request) (query string, hasCou
 }
 
 // SchemaClause return a SELECT `query`
-func (adapter *Postgres) SchemaClause(req *http.Request) (query string, hasCount bool) {
+func (adapter *MySQL) SchemaClause(req *http.Request) (query string, hasCount bool) {
 	queries := req.URL.Query()
 	countQuery := queries.Get("_count")
 
@@ -453,7 +457,7 @@ func (adapter *Postgres) SchemaClause(req *http.Request) (query string, hasCount
 }
 
 // JoinByRequest implements join in queries
-func (adapter *Postgres) JoinByRequest(r *http.Request) (values []string, err error) {
+func (adapter *MySQL) JoinByRequest(r *http.Request) (values []string, err error) {
 	queries := r.URL.Query()
 
 	if queries.Get("_join") == "" {
@@ -496,7 +500,7 @@ func (adapter *Postgres) JoinByRequest(r *http.Request) (values []string, err er
 }
 
 // SelectFields query
-func (adapter *Postgres) SelectFields(fields []string) (sql string, err error) {
+func (adapter *MySQL) SelectFields(fields []string) (sql string, err error) {
 	if len(fields) == 0 {
 		err = errors.New("you must select at least one field")
 		return
@@ -525,7 +529,7 @@ func (adapter *Postgres) SelectFields(fields []string) (sql string, err error) {
 }
 
 // OrderByRequest implements ORDER BY in queries
-func (adapter *Postgres) OrderByRequest(r *http.Request) (values string, err error) {
+func (adapter *MySQL) OrderByRequest(r *http.Request) (values string, err error) {
 	queries := r.URL.Query()
 	reqOrder := queries.Get("_order")
 
@@ -558,7 +562,7 @@ func (adapter *Postgres) OrderByRequest(r *http.Request) (values string, err err
 }
 
 // CountByRequest implements COUNT(fields) OPERTATION
-func (adapter *Postgres) CountByRequest(req *http.Request) (countQuery string, err error) {
+func (adapter *MySQL) CountByRequest(req *http.Request) (countQuery string, err error) {
 	queries := req.URL.Query()
 	countFields := queries.Get("_count")
 	if countFields == "" {
@@ -580,14 +584,13 @@ func (adapter *Postgres) CountByRequest(req *http.Request) (countQuery string, e
 }
 
 // Query process queries
-func (adapter *Postgres) Query(SQL string, params ...interface{}) (sc adapters.Scanner) {
+func (adapter *MySQL) Query(SQL string, params ...interface{}) (sc adapters.Scanner) {
 	db, err := connection.Get()
 	if err != nil {
 		log.Println(err)
 		sc = &scanner.PrestScanner{Error: err}
 		return
 	}
-	SQL = fmt.Sprintf("SELECT json_agg(s) FROM (%s) s", SQL)
 	log.Debugln("generated SQL:", SQL, " parameters: ", params)
 	p, err := Prepare(db, SQL)
 	if err != nil {
@@ -595,7 +598,10 @@ func (adapter *Postgres) Query(SQL string, params ...interface{}) (sc adapters.S
 		return
 	}
 	var jsonData []byte
-	err = p.QueryRow(params...).Scan(&jsonData)
+	//err = p.QueryRow(params...).Scan(&jsonData)
+	rows, err := p.Query(params...)
+	jsonData, err = rowsToJSON(rows)
+	//
 	if len(jsonData) == 0 {
 		jsonData = []byte("[]")
 	}
@@ -608,7 +614,7 @@ func (adapter *Postgres) Query(SQL string, params ...interface{}) (sc adapters.S
 }
 
 // QueryCount process queries with count
-func (adapter *Postgres) QueryCount(SQL string, params ...interface{}) (sc adapters.Scanner) {
+func (adapter *MySQL) QueryCount(SQL string, params ...interface{}) (sc adapters.Scanner) {
 	db, err := connection.Get()
 	if err != nil {
 		sc = &scanner.PrestScanner{Error: err}
@@ -640,7 +646,7 @@ func (adapter *Postgres) QueryCount(SQL string, params ...interface{}) (sc adapt
 }
 
 // PaginateIfPossible func
-func (adapter *Postgres) PaginateIfPossible(r *http.Request) (paginatedQuery string, err error) {
+func (adapter *MySQL) PaginateIfPossible(r *http.Request) (paginatedQuery string, err error) {
 	values := r.URL.Query()
 	if _, ok := values[pageNumberKey]; !ok {
 		paginatedQuery = ""
@@ -662,131 +668,20 @@ func (adapter *Postgres) PaginateIfPossible(r *http.Request) (paginatedQuery str
 }
 
 // BatchInsertCopy execute batch insert sql into a table unsing copy
-func (adapter *Postgres) BatchInsertCopy(dbname, schema, table string, keys []string, values ...interface{}) (sc adapters.Scanner) {
-	db, err := connection.Get()
-	if err != nil {
-		log.Println(err)
-		sc = &scanner.PrestScanner{Error: err}
-		return
-	}
-	tx, err := db.Begin()
-	if err != nil {
-		log.Println(err)
-		sc = &scanner.PrestScanner{Error: err}
-		return
-	}
-	defer func() {
-		var txerr error
-		if err != nil {
-			txerr = tx.Rollback()
-			if txerr != nil {
-				log.Errorln(txerr)
-				return
-			}
-			return
-		}
-		txerr = tx.Commit()
-		if txerr != nil {
-			log.Errorln(txerr)
-			return
-		}
-	}()
-	for i := range keys {
-		if strings.HasPrefix(keys[i], `"`) {
-			keys[i], err = strconv.Unquote(keys[i])
-			if err != nil {
-				log.Println(err)
-				sc = &scanner.PrestScanner{Error: err}
-				return
-			}
-		}
-	}
-	stmt, err := tx.Prepare(pq.CopyInSchema(schema, table, keys...))
-	if err != nil {
-		log.Println(err)
-		sc = &scanner.PrestScanner{Error: err}
-		return
-	}
-	initOffSet := 0
-	limitOffset := len(keys)
-	for limitOffset <= len(values) {
-		_, err = stmt.Exec(values[initOffSet:limitOffset]...)
-		if err != nil {
-			log.Println(err)
-			sc = &scanner.PrestScanner{Error: err}
-			return
-		}
-		initOffSet = limitOffset
-		limitOffset += len(keys)
-	}
-	_, err = stmt.Exec()
-	if err != nil {
-		log.Println(err)
-		sc = &scanner.PrestScanner{Error: err}
-		return
-	}
-	err = stmt.Close()
-	if err != nil {
-		log.Println(err)
-		sc = &scanner.PrestScanner{Error: err}
-		return
-	}
-	sc = &scanner.PrestScanner{}
+func (adapter *MySQL) BatchInsertCopy(dbname, schema, table string, keys []string, values ...interface{}) (sc adapters.Scanner) {
+	err := errors.New("not implemented")
+	sc = &scanner.PrestScanner{Error: err}
 	return
 }
 
 // BatchInsertValues execute batch insert sql into a table unsing multi values
-func (adapter *Postgres) BatchInsertValues(SQL string, values ...interface{}) (sc adapters.Scanner) {
-	db, err := connection.Get()
-	if err != nil {
-		log.Println(err)
-		sc = &scanner.PrestScanner{Error: err}
-		return
-	}
-	stmt, err := adapter.fullInsert(db, nil, SQL)
-	if err != nil {
-		log.Println(err)
-		sc = &scanner.PrestScanner{Error: err}
-		return
-	}
-	jsonData := []byte("[")
-	rows, err := stmt.Query(values...)
-	if err != nil {
-		log.Println(err)
-		sc = &scanner.PrestScanner{Error: err}
-		return
-	}
-	for rows.Next() {
-		if err = rows.Err(); err != nil {
-			if err != nil {
-				log.Println(err)
-				sc = &scanner.PrestScanner{Error: err}
-				return
-			}
-		}
-		var data []byte
-		err = rows.Scan(&data)
-		if err != nil {
-			log.Println(err)
-			sc = &scanner.PrestScanner{Error: err}
-			return
-		}
-		if !bytes.Equal(jsonData, []byte("[")) {
-			obj := fmt.Sprintf("%s,%s", jsonData, data)
-			jsonData = []byte(obj)
-			continue
-		}
-		jsonData = append(jsonData, data...)
-	}
-	jsonData = append(jsonData, byte(']'))
-	sc = &scanner.PrestScanner{
-		Buff:    bytes.NewBuffer(jsonData),
-		IsQuery: true,
-	}
+func (adapter *MySQL) BatchInsertValues(SQL string, values ...interface{}) (sc adapters.Scanner) {
+	err := errors.New("not implemented")
+	sc = &scanner.PrestScanner{Error: err}
 	return
 }
 
-func (adapter *Postgres) fullInsert(db *sqlx.DB, tx *sql.Tx, SQL string) (stmt *sql.Stmt, err error) {
+func (adapter *MySQL) fullInsert(db *sqlx.DB, tx *sql.Tx, SQL string) (stmt *sql.Stmt, err error) {
 	tableName := insertTableNameQuotesRegex.FindStringSubmatch(SQL)
 	if len(tableName) < 2 {
 		tableName = insertTableNameRegex.FindStringSubmatch(SQL)
@@ -795,7 +690,7 @@ func (adapter *Postgres) fullInsert(db *sqlx.DB, tx *sql.Tx, SQL string) (stmt *
 			return
 		}
 	}
-	SQL = fmt.Sprintf(`%s RETURNING row_to_json("%s")`, SQL, tableName[2])
+	//SQL = fmt.Sprintf(`%s RETURNING row_to_json("%s")`, SQL, tableName[2])
 	if tx != nil {
 		stmt, err = PrepareTx(tx, SQL)
 	} else {
@@ -805,24 +700,50 @@ func (adapter *Postgres) fullInsert(db *sqlx.DB, tx *sql.Tx, SQL string) (stmt *
 }
 
 // Insert execute insert sql into a table
-func (adapter *Postgres) Insert(SQL string, params ...interface{}) (sc adapters.Scanner) {
+func (adapter *MySQL) Insert(SQL string, params ...interface{}) (sc adapters.Scanner) {
 	db, err := connection.Get()
 	if err != nil {
 		log.Println(err)
 		sc = &scanner.PrestScanner{Error: err}
 		return
 	}
-	sc = adapter.insert(db, nil, SQL, params...)
-	return
+	//sc = adapter.insert(db, nil, SQL, params...)
+	sc = adapter.update(db, nil, SQL, params...)
+	if sc.Err() != nil {
+		return
+	}
+	// Create return sql
+	re := regexp.MustCompile(`(\(.*\).)+`)
+	textFields := re.FindString(SQL)
+	textFields = strings.Replace(textFields, " ", "", -1)
+	textFields = strings.Replace(textFields, "(", "", -1)
+	textFields = strings.Replace(textFields, ")", "", -1)
+	fields := strings.Split(textFields, ",")
+
+	whereSyntax := ""
+	for i := 0; i < len(fields); i++ {
+		if whereSyntax == "" {
+			whereSyntax += fields[i] + "=?"
+		} else {
+			whereSyntax += " AND " + fields[i] + "=?"
+		}
+	}
+
+	sqlSelect := strings.Split(SQL, "(")[0]
+	sqlSelect = strings.Replace(sqlSelect, "INSERT INTO", "", -1)
+	sqlSelect = strings.Replace(sqlSelect, " ", "", -1)
+	sqlSelect = fmt.Sprint("SELECT * FROM ", sqlSelect, " WHERE ", whereSyntax)
+
+	return adapter.Query(sqlSelect, params...)
 }
 
 // InsertWithTransaction execute insert sql into a table
-func (adapter *Postgres) InsertWithTransaction(tx *sql.Tx, SQL string, params ...interface{}) (sc adapters.Scanner) {
+func (adapter *MySQL) InsertWithTransaction(tx *sql.Tx, SQL string, params ...interface{}) (sc adapters.Scanner) {
 	sc = adapter.insert(nil, tx, SQL, params...)
 	return
 }
 
-func (adapter *Postgres) insert(db *sqlx.DB, tx *sql.Tx, SQL string, params ...interface{}) (sc adapters.Scanner) {
+func (adapter *MySQL) insert(db *sqlx.DB, tx *sql.Tx, SQL string, params ...interface{}) (sc adapters.Scanner) {
 	stmt, err := adapter.fullInsert(db, tx, SQL)
 	if err != nil {
 		log.Println(err)
@@ -840,7 +761,7 @@ func (adapter *Postgres) insert(db *sqlx.DB, tx *sql.Tx, SQL string, params ...i
 }
 
 // Delete execute delete sql into a table
-func (adapter *Postgres) Delete(SQL string, params ...interface{}) (sc adapters.Scanner) {
+func (adapter *MySQL) Delete(SQL string, params ...interface{}) (sc adapters.Scanner) {
 	db, err := connection.Get()
 	if err != nil {
 		log.Println(err)
@@ -852,12 +773,12 @@ func (adapter *Postgres) Delete(SQL string, params ...interface{}) (sc adapters.
 }
 
 // DeleteWithTransaction execute delete sql into a table
-func (adapter *Postgres) DeleteWithTransaction(tx *sql.Tx, SQL string, params ...interface{}) (sc adapters.Scanner) {
+func (adapter *MySQL) DeleteWithTransaction(tx *sql.Tx, SQL string, params ...interface{}) (sc adapters.Scanner) {
 	sc = adapter.delete(nil, tx, SQL, params...)
 	return
 }
 
-func (adapter *Postgres) delete(db *sqlx.DB, tx *sql.Tx, SQL string, params ...interface{}) (sc adapters.Scanner) {
+func (adapter *MySQL) delete(db *sqlx.DB, tx *sql.Tx, SQL string, params ...interface{}) (sc adapters.Scanner) {
 	log.Debugln("generated SQL:", SQL, " parameters: ", params)
 	var stmt *sql.Stmt
 	var err error
@@ -927,7 +848,7 @@ func (adapter *Postgres) delete(db *sqlx.DB, tx *sql.Tx, SQL string, params ...i
 }
 
 // Update execute update sql into a table
-func (adapter *Postgres) Update(SQL string, params ...interface{}) (sc adapters.Scanner) {
+func (adapter *MySQL) Update(SQL string, params ...interface{}) (sc adapters.Scanner) {
 	db, err := connection.Get()
 	if err != nil {
 		log.Println(err)
@@ -939,12 +860,12 @@ func (adapter *Postgres) Update(SQL string, params ...interface{}) (sc adapters.
 }
 
 // UpdateWithTransaction execute update sql into a table
-func (adapter *Postgres) UpdateWithTransaction(tx *sql.Tx, SQL string, params ...interface{}) (sc adapters.Scanner) {
+func (adapter *MySQL) UpdateWithTransaction(tx *sql.Tx, SQL string, params ...interface{}) (sc adapters.Scanner) {
 	sc = adapter.update(nil, tx, SQL, params...)
 	return
 }
 
-func (adapter *Postgres) update(db *sqlx.DB, tx *sql.Tx, SQL string, params ...interface{}) (sc adapters.Scanner) {
+func (adapter *MySQL) update(db *sqlx.DB, tx *sql.Tx, SQL string, params ...interface{}) (sc adapters.Scanner) {
 	var stmt *sql.Stmt
 	var err error
 	if tx != nil {
@@ -1065,7 +986,7 @@ func GetQueryOperator(op string) (string, error) {
 }
 
 // TablePermissions get tables permissions based in prest configuration
-func (adapter *Postgres) TablePermissions(table string, op string) bool {
+func (adapter *MySQL) TablePermissions(table string, op string) bool {
 	restrict := config.PrestConf.AccessConf.Restrict
 	if !restrict {
 		return true
@@ -1118,7 +1039,7 @@ func intersection(set, other []string) (intersection []string) {
 }
 
 // FieldsPermissions get fields permissions based in prest configuration
-func (adapter *Postgres) FieldsPermissions(r *http.Request, table string, op string) (fields []string, err error) {
+func (adapter *MySQL) FieldsPermissions(r *http.Request, table string, op string) (fields []string, err error) {
 	cols, err := columnsByRequest(r)
 	if err != nil {
 		err = fmt.Errorf("error on parse columns from request: %s", err)
@@ -1209,7 +1130,7 @@ func columnsByRequest(r *http.Request) (columns []string, err error) {
 }
 
 // DistinctClause get params in request to add distinct clause
-func (adapter *Postgres) DistinctClause(r *http.Request) (distinctQuery string, err error) {
+func (adapter *MySQL) DistinctClause(r *http.Request) (distinctQuery string, err error) {
 	queries := r.URL.Query()
 	checkQuery := queries.Get("_distinct")
 	distinctQuery = ""
@@ -1221,7 +1142,7 @@ func (adapter *Postgres) DistinctClause(r *http.Request) (distinctQuery string, 
 }
 
 // GroupByClause get params in request to add group by clause
-func (adapter *Postgres) GroupByClause(r *http.Request) (groupBySQL string) {
+func (adapter *MySQL) GroupByClause(r *http.Request) (groupBySQL string) {
 	queries := r.URL.Query()
 	groupQuery := queries.Get("_groupby")
 	if groupQuery == "" {
@@ -1289,32 +1210,32 @@ func NormalizeGroupFunction(paramValue string) (groupFuncSQL string, err error) 
 }
 
 // SetDatabase set the current database name in use
-func (adapter *Postgres) SetDatabase(name string) {
+func (adapter *MySQL) SetDatabase(name string) {
 	connection.SetDatabase(name)
 }
 
 // SelectSQL generate select sql
-func (adapter *Postgres) SelectSQL(selectStr string, database string, schema string, table string) string {
-	return fmt.Sprintf(`%s "%s"."%s"."%s"`, selectStr, database, schema, table)
+func (adapter *MySQL) SelectSQL(selectStr string, database string, schema string, table string) string {
+	return fmt.Sprintf(`%s %s.%s`, selectStr, database, table)
 }
 
 // InsertSQL generate insert sql
-func (adapter *Postgres) InsertSQL(database string, schema string, table string, names string, placeholders string) string {
-	return fmt.Sprintf(statements.InsertQuery, database, schema, table, names, placeholders)
+func (adapter *MySQL) InsertSQL(database string, schema string, table string, names string, placeholders string) string {
+	return fmt.Sprintf(statements.InsertQuery, database, table, names, placeholders)
 }
 
 // DeleteSQL generate delete sql
-func (adapter *Postgres) DeleteSQL(database string, schema string, table string) string {
-	return fmt.Sprintf(statements.DeleteQuery, database, schema, table)
+func (adapter *MySQL) DeleteSQL(database string, schema string, table string) string {
+	return fmt.Sprintf(statements.DeleteQuery, database, table)
 }
 
 // UpdateSQL generate update sql
-func (adapter *Postgres) UpdateSQL(database string, schema string, table string, setSyntax string) string {
-	return fmt.Sprintf(statements.UpdateQuery, database, schema, table, setSyntax)
+func (adapter *MySQL) UpdateSQL(database string, schema string, table string, setSyntax string) string {
+	return fmt.Sprintf(statements.UpdateQuery, database, table, setSyntax)
 }
 
 // DatabaseWhere generate database where syntax
-func (adapter *Postgres) DatabaseWhere(requestWhere string) (whereSyntax string) {
+func (adapter *MySQL) DatabaseWhere(requestWhere string) (whereSyntax string) {
 	whereSyntax = statements.DatabasesWhere
 	if requestWhere != "" {
 		whereSyntax = fmt.Sprint(whereSyntax, " AND ", requestWhere)
@@ -1323,7 +1244,7 @@ func (adapter *Postgres) DatabaseWhere(requestWhere string) (whereSyntax string)
 }
 
 // DatabaseOrderBy generate database order by
-func (adapter *Postgres) DatabaseOrderBy(order string, hasCount bool) (orderBy string) {
+func (adapter *MySQL) DatabaseOrderBy(order string, hasCount bool) (orderBy string) {
 	if order != "" {
 		orderBy = order
 	} else if !hasCount {
@@ -1333,7 +1254,7 @@ func (adapter *Postgres) DatabaseOrderBy(order string, hasCount bool) (orderBy s
 }
 
 // SchemaOrderBy generate schema order by
-func (adapter *Postgres) SchemaOrderBy(order string, hasCount bool) (orderBy string) {
+func (adapter *MySQL) SchemaOrderBy(order string, hasCount bool) (orderBy string) {
 	if order != "" {
 		orderBy = order
 	} else if !hasCount {
@@ -1343,13 +1264,13 @@ func (adapter *Postgres) SchemaOrderBy(order string, hasCount bool) (orderBy str
 }
 
 // TableClause generate table clause
-func (adapter *Postgres) TableClause() (query string) {
+func (adapter *MySQL) TableClause() (query string) {
 	query = statements.TablesSelect
 	return
 }
 
 // TableWhere generate table where syntax
-func (adapter *Postgres) TableWhere(requestWhere string) (whereSyntax string) {
+func (adapter *MySQL) TableWhere(requestWhere string) (whereSyntax string) {
 	whereSyntax = statements.TablesWhere
 	if requestWhere != "" {
 		whereSyntax = fmt.Sprint(whereSyntax, " AND ", requestWhere)
@@ -1358,7 +1279,7 @@ func (adapter *Postgres) TableWhere(requestWhere string) (whereSyntax string) {
 }
 
 // TableOrderBy generate table order by
-func (adapter *Postgres) TableOrderBy(order string) (orderBy string) {
+func (adapter *MySQL) TableOrderBy(order string) (orderBy string) {
 	if order != "" {
 		orderBy = order
 	} else {
@@ -1368,13 +1289,13 @@ func (adapter *Postgres) TableOrderBy(order string) (orderBy string) {
 }
 
 // SchemaTablesClause generate schema tables clause
-func (adapter *Postgres) SchemaTablesClause() (query string) {
+func (adapter *MySQL) SchemaTablesClause() (query string) {
 	query = statements.SchemaTablesSelect
 	return
 }
 
 // SchemaTablesWhere generate schema tables where syntax
-func (adapter *Postgres) SchemaTablesWhere(requestWhere string) (whereSyntax string) {
+func (adapter *MySQL) SchemaTablesWhere(requestWhere string) (whereSyntax string) {
 	whereSyntax = statements.SchemaTablesWhere
 	if requestWhere != "" {
 		whereSyntax = fmt.Sprint(whereSyntax, " AND ", requestWhere)
@@ -1383,11 +1304,58 @@ func (adapter *Postgres) SchemaTablesWhere(requestWhere string) (whereSyntax str
 }
 
 // SchemaTablesOrderBy generate schema tables order by
-func (adapter *Postgres) SchemaTablesOrderBy(order string) (orderBy string) {
+func (adapter *MySQL) SchemaTablesOrderBy(order string) (orderBy string) {
 	if order != "" {
 		orderBy = order
 	} else {
 		orderBy = statements.SchemaTablesOrderBy
 	}
 	return
+}
+
+func rowsToJSON(rows *sql.Rows) ([]byte, error) {
+	columns, err := rows.Columns()
+	if err != nil {
+		log.Debugln(err)
+		return []byte("[]"), err
+	}
+
+	tableData := make([]map[string]interface{}, 0)
+
+	count := len(columns)
+	values := make([]interface{}, count)
+	scanArgs := make([]interface{}, count)
+	for i := range values {
+		scanArgs[i] = &values[i]
+	}
+
+	for rows.Next() {
+		err := rows.Scan(scanArgs...)
+		if err != nil {
+			log.Debugln(err)
+			return []byte("[]"), err
+		}
+
+		entry := make(map[string]interface{})
+		for i, col := range columns {
+			v := values[i]
+
+			b, ok := v.([]byte)
+			if ok {
+				entry[col] = string(b)
+			} else {
+				entry[col] = v
+			}
+		}
+
+		tableData = append(tableData, entry)
+	}
+
+	jsonData, err := json.Marshal(tableData)
+	if err != nil {
+		log.Debugln(err)
+		return []byte("[]"), err
+	}
+
+	return jsonData, nil
 }

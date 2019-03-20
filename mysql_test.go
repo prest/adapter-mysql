@@ -1,4 +1,4 @@
-package postgres
+package mysql
 
 import (
 	"bytes"
@@ -11,10 +11,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/joelmdesouza/mysql/internal/connection"
+	"github.com/joelmdesouza/mysql/statements"
 	"github.com/nuveo/log"
 	"github.com/prest/adapters"
-	"github.com/prest/adapters/postgres/internal/connection"
-	"github.com/prest/adapters/postgres/statements"
 	"github.com/prest/config"
 )
 
@@ -1213,62 +1213,7 @@ func TestBatchInsertValues(t *testing.T) {
 }
 
 func TestPostgres_BatchInsertCopy(t *testing.T) {
-	config.Load()
-	Load()
-	type args struct {
-		dbname string
-		schema string
-		table  string
-		keys   []string
-		values []interface{}
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{
-			"batch copy",
-			args{
-				"prest",
-				"public",
-				"Reply",
-				[]string{`"name"`},
-				[]interface{}{"copy"},
-			},
-			false,
-		},
-		{
-			"batch copy without quotes",
-			args{
-				"prest",
-				"public",
-				"Reply",
-				[]string{"name"},
-				[]interface{}{"copy"},
-			},
-			false,
-		},
-		{
-			"batch copy with err",
-			args{
-				"prest",
-				"public",
-				"Reply",
-				[]string{"na"},
-				[]interface{}{"copy"},
-			},
-			true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotSc := config.PrestConf.Adapter.BatchInsertCopy(tt.args.dbname, tt.args.schema, tt.args.table, tt.args.keys, tt.args.values...)
-			if (gotSc.Err() != nil) != tt.wantErr {
-				t.Errorf("Postgres.BatchInsertCopy() = %v, want %v", gotSc.Err(), tt.wantErr)
-			}
-		})
-	}
+
 }
 
 func TestPostgres_FieldsPermissions(t *testing.T) {
@@ -1417,7 +1362,7 @@ func TestPostgres_FieldsPermissions(t *testing.T) {
 				Fields:      tt.args.fields,
 			})
 		t.Run(tt.name, func(t *testing.T) {
-			adapter := &Postgres{}
+			adapter := &MySQL{}
 			r, err := http.NewRequest(http.MethodGet, tt.args.url, strings.NewReader(""))
 			if err != nil {
 				t.Fatal(err)

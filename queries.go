@@ -1,4 +1,4 @@
-package postgres
+package mysql
 
 import (
 	"bytes"
@@ -10,16 +10,16 @@ import (
 	"path/filepath"
 	gotemplate "text/template"
 
+	"github.com/joelmdesouza/mysql/internal/connection"
 	"github.com/nuveo/log"
 	"github.com/prest/adapters"
-	"github.com/prest/adapters/postgres/internal/connection"
 	"github.com/prest/adapters/scanner"
 	"github.com/prest/config"
 	"github.com/prest/template"
 )
 
 // GetScript get SQL template file
-func (adapter *Postgres) GetScript(verb, folder, scriptName string) (script string, err error) {
+func (adapter *MySQL) GetScript(verb, folder, scriptName string) (script string, err error) {
 	verbs := map[string]string{
 		"GET":    ".read.sql",
 		"POST":   ".write.sql",
@@ -45,7 +45,7 @@ func (adapter *Postgres) GetScript(verb, folder, scriptName string) (script stri
 }
 
 // ParseScript use values sent by users and add on script
-func (adapter *Postgres) ParseScript(scriptPath string, queryURL url.Values) (sqlQuery string, values []interface{}, err error) {
+func (adapter *MySQL) ParseScript(scriptPath string, queryURL url.Values) (sqlQuery string, values []interface{}, err error) {
 	_, tplName := path.Split(scriptPath)
 	q := make(map[string]interface{})
 	for key, value := range queryURL {
@@ -123,7 +123,7 @@ func WriteSQL(sql string, values []interface{}) (sc adapters.Scanner) {
 }
 
 // ExecuteScripts run sql templates created by users
-func (adapter *Postgres) ExecuteScripts(method, sql string, values []interface{}) (sc adapters.Scanner) {
+func (adapter *MySQL) ExecuteScripts(method, sql string, values []interface{}) (sc adapters.Scanner) {
 	switch method {
 	case "GET":
 		sc = adapter.Query(sql, values...)

@@ -1,16 +1,16 @@
-package postgres
+package mysql
 
 import (
 	"github.com/jmoiron/sqlx"
-	"github.com/prest/adapters/postgres/internal/connection"
+	"github.com/joelmdesouza/mysql/internal/connection"
 )
 
-// GetURI postgres connection URI
+// GetURI mysql connection URI
 func GetURI(DBName string) string {
 	return connection.GetURI(DBName)
 }
 
-// Get get postgres connection
+// Get get mysql connection
 func Get() (*sqlx.DB, error) {
 	return connection.Get()
 }
@@ -25,7 +25,7 @@ func AddDatabaseToPool(name string, DB *sqlx.DB) {
 	connection.AddDatabaseToPool(name, DB)
 }
 
-// MustGet get postgres connection
+// MustGet get mysql connection
 func MustGet() *sqlx.DB {
 	return connection.MustGet()
 }

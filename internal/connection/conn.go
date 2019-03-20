@@ -6,8 +6,9 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/prest/config"
-	// Used pg drive on sqlx
-	_ "github.com/lib/pq"
+
+	// Used mysql drive on sqlx
+	_ "github.com/go-sql-driver/mysql"
 )
 
 var (
@@ -22,21 +23,21 @@ type ConnectionPool struct {
 	DB  map[string]*sqlx.DB
 }
 
-// GetURI postgres connection URI
+// GetURI mysql connection URI
 func GetURI(DBName string) string {
 	var dbURI string
 
 	if DBName == "" {
 		DBName = config.PrestConf.PGDatabase
 	}
-	dbURI = fmt.Sprintf("user=%s dbname=%s host=%s port=%v sslmode=%v connect_timeout=%d",
+	dbURI = fmt.Sprintf("%s:%s@tcp(%s:%v)/%s?charset=utf8&allowOldPasswords=true",
 		config.PrestConf.PGUser,
-		DBName,
+		config.PrestConf.PGPass,
 		config.PrestConf.PGHost,
 		config.PrestConf.PGPort,
-		config.PrestConf.SSLMode,
-		config.PrestConf.PGConnTimeout)
+		DBName)
 
+	/* not implemented
 	if config.PrestConf.PGPass != "" {
 		dbURI += " password=" + config.PrestConf.PGPass
 	}
@@ -49,11 +50,12 @@ func GetURI(DBName string) string {
 	if config.PrestConf.SSLRootCert != "" {
 		dbURI += " sslrootcert=" + config.PrestConf.SSLRootCert
 	}
+	*/
 
 	return dbURI
 }
 
-// Get get postgres connection
+// Get get mysql connection
 func Get() (*sqlx.DB, error) {
 	var DB *sqlx.DB
 
@@ -62,7 +64,7 @@ func Get() (*sqlx.DB, error) {
 		return DB, nil
 	}
 
-	DB, err = sqlx.Connect("postgres", GetURI(GetDatabase()))
+	DB, err = sqlx.Connect("mysql", GetURI(GetDatabase()))
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +111,7 @@ func AddDatabaseToPool(name string, DB *sqlx.DB) {
 	p.Mtx.Unlock()
 }
 
-// MustGet get postgres connection
+// MustGet get mysql connection
 func MustGet() *sqlx.DB {
 	var err error
 	var DB *sqlx.DB
