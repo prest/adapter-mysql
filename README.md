@@ -18,13 +18,43 @@ Select operations over a TABLE
 
 [-] /DATABASE/SCHEMA/TABLE?_select=column[array id] (select statement by array colum)
 
+Operators
+- [X] $eq
+- [X] $gt
+- [X] $gte
+- [X] $lt
+- [X] $lte
+- [X] $ne
+- [X] $in
+- [X] $nin
+- [X] $null
+- [X] $notnull
+- [X] $true
+- [X] $nottrue
+- [X] $false
+- [X] $notfalse
+- [X] $like
+- [X] $ilike
+
 Join
 - [X] /DATABASE/SCHEMA/Table?_join=Type:Table2:Table.field:Operator:Table2.field
 
 ORDER BY
-- [X] /DATABASE/SCHEMA/TABLE/?_order=fieldname (ASC)
-- [X] /DATABASE/SCHEMA/TABLE/?_order=-fieldname (DESC)
-- [X] /DATABASE/SCHEMA/TABLE/?_order=fieldname01,-fieldname02,fieldname03 (Multiple Orders)
+- [X] /DATABASE/SCHEMA/TABLE?_order=fieldname (ASC)
+- [X] /DATABASE/SCHEMA/TABLE?_order=-fieldname (DESC)
+- [X] /DATABASE/SCHEMA/TABLE?_order=fieldname01,-fieldname02,fieldname03 (Multiple Orders)
+
+GROUP BY
+- [X] /DATABASE/SCHEMA/TABLE?_select=fieldname00,fieldname01&_groupby=fieldname01
+- [X] /DATABASE/SCHEMA/TABLE/?_select=fieldname00,sum:fieldname01&_groupby=fieldname00 (SUM)
+- [X] /DATABASE/SCHEMA/TABLE/?_select=fieldname00,avg:fieldname01&_groupby=fieldname00 (AVG)
+- [X] /DATABASE/SCHEMA/TABLE/?_select=fieldname00,max:fieldname01&_groupby=fieldname00 (MAX)
+- [X] /DATABASE/SCHEMA/TABLE/?_select=fieldname00,min:fieldname01&_groupby=fieldname00 (MIN)
+- [X] /DATABASE/SCHEMA/TABLE/?_select=fieldname00,stddev:fieldname01&_groupby=fieldname00 (STDDEV)
+- [X] /DATABASE/SCHEMA/TABLE/?_select=fieldname00,variance:fieldname01&_groupby=fieldname00 (VARIANCE)
+- [X] /DATABASE/SCHEMA/TABLE/?_groupby=fieldname->>having:GROUPFUNC:FIELDNAME:CONDITION:VALUE_CONDITION (HAVING)
+
+[-] /DATABASE/SCHEMA/TABLE/?_select=fieldname00,median:fieldname01&_groupby=fieldname00 (MEDIAN)
 
 Select operations over a VIEW
 - [X] /DATABASE/SCHEMA/TABLE (show all rows, find by database and VIEW)

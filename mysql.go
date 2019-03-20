@@ -243,7 +243,7 @@ func (adapter *MySQL) WhereByRequest(r *http.Request, initialPlaceholderID int) 
 					keyParams := make([]string, len(v))
 					for i := 0; i < len(v); i++ {
 						whereValues = append(whereValues, v[i])
-						keyParams[i] = fmt.Sprintf(`$%d`, pid+i)
+						keyParams[i] = `?`
 					}
 					pid += len(v)
 					whereKey = append(whereKey, fmt.Sprintf(`%s %s (%s)`, key, op, strings.Join(keyParams, ",")))
@@ -253,6 +253,10 @@ func (adapter *MySQL) WhereByRequest(r *http.Request, initialPlaceholderID int) 
 					pid++
 				case "IS NULL", "IS NOT NULL", "IS TRUE", "IS NOT TRUE", "IS FALSE", "IS NOT FALSE":
 					whereKey = append(whereKey, fmt.Sprintf(`%s %s`, key, op))
+				case "ILIKE":
+					whereKey = append(whereKey, fmt.Sprintf(`LOWER(%s) LIKE LOWER(?)`, key))
+					whereValues = append(whereValues, value)
+					pid++
 				default: // "=", "!=", ">", ">=", "<", "<="
 					whereKey = append(whereKey, fmt.Sprintf(`%s %s ?`, key, op))
 					whereValues = append(whereValues, value)
@@ -1161,7 +1165,7 @@ func (adapter *MySQL) GroupByClause(r *http.Request) (groupBySQL string) {
 		fields := strings.Split(groupFieldQuery[0], ",")
 		for i, field := range fields {
 			f := strings.Split(field, ".")
-			fields[i] = fmt.Sprintf(`"%s"`, strings.Join(f, `"."`))
+			fields[i] = fmt.Sprintf(`%s`, strings.Join(f, `"."`))
 		}
 		groupFieldQuery[0] = strings.Join(fields, ",")
 		if len(params) != 5 {
@@ -1188,7 +1192,7 @@ func (adapter *MySQL) GroupByClause(r *http.Request) (groupBySQL string) {
 	fields := strings.Split(groupQuery, ",")
 	for i, field := range fields {
 		f := strings.Split(field, ".")
-		fields[i] = fmt.Sprintf(`"%s"`, strings.Join(f, `"."`))
+		fields[i] = fmt.Sprintf(`%s`, strings.Join(f, `"."`))
 	}
 	groupQuery = strings.Join(fields, ",")
 	groupBySQL = fmt.Sprintf(statements.GroupBy, groupQuery)
@@ -1204,7 +1208,7 @@ func NormalizeGroupFunction(paramValue string) (groupFuncSQL string, err error) 
 		// values[1] it's a field in table
 		v := values[1]
 		if v != "*" {
-			values[1] = fmt.Sprintf(`"%s"`, v)
+			values[1] = fmt.Sprintf(`%s`, v)
 		}
 		groupFuncSQL = fmt.Sprintf(`%s(%s)`, groupFunc, values[1])
 		return
