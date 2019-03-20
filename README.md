@@ -14,6 +14,7 @@ Select operations over a TABLE
 - [X] /DATABASE/SCHEMA/TABLE?_page=2&_page_size=10 (pagination, page_size 10 by default)
 - [X] /DATABASE/SCHEMA/TABLE?FIELD=VALUE (filter)
 - [X] /DATABASE/SCHEMA/TABLE?_renderer=xml (JSON by default)
+
 [-] /DATABASE/SCHEMA/TABLE?_select=column[array id] (select statement by array colum)
 
 Join
