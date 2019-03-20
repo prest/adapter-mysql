@@ -8,13 +8,13 @@
 Select operations over a TABLE
 - [X] /DATABASE/SCHEMA/TABLE (show all rows, find by database and table)
 - [X] /DATABASE/SCHEMA/TABLE?_select=column (select statement by columns)
-- [-] /DATABASE/SCHEMA/TABLE?_select=column[array id] (select statement by array colum)
 - [X] /DATABASE/SCHEMA/TABLE?_select=* (select all from TABLE)
 - [X] /DATABASE/SCHEMA/TABLE?_count=* (use count function)
 - [X] /DATABASE/SCHEMA/TABLE?_count=column (use count function)
 - [X] /DATABASE/SCHEMA/TABLE?_page=2&_page_size=10 (pagination, page_size 10 by default)
 - [X] /DATABASE/SCHEMA/TABLE?FIELD=VALUE (filter)
 - [X] /DATABASE/SCHEMA/TABLE?_renderer=xml (JSON by default)
+[-] /DATABASE/SCHEMA/TABLE?_select=column[array id] (select statement by array colum)
 
 Join
 - [X] /DATABASE/SCHEMA/Table?_join=Type:Table2:Table.field:Operator:Table2.field
