@@ -1,5 +1,7 @@
 # MySQL Adapter to pRest project https://postgres.rest/
 
+[![Build Status](https://travis-ci.org/joelmdesouza/mysql.svg?branch=master)](https://travis-ci.org/joelmdesouza/mysql)
+
 - [ ] Not Implemented
 - [X] Implemented
 
