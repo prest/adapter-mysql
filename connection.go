@@ -2,7 +2,7 @@ package mysql
 
 import (
 	"github.com/jmoiron/sqlx"
-	"github.com/joelmdesouza/mysql/internal/connection"
+	"github.com/prest/adapter-mysql/internal/connection"
 )
 
 // GetURI mysql connection URI

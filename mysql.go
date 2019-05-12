@@ -16,10 +16,10 @@ import (
 	"unicode"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/joelmdesouza/mysql/formatters"
-	"github.com/joelmdesouza/mysql/internal/connection"
-	"github.com/joelmdesouza/mysql/statements"
 	"github.com/nuveo/log"
+	"github.com/prest/adapter-mysql/formatters"
+	"github.com/prest/adapter-mysql/internal/connection"
+	"github.com/prest/adapter-mysql/statements"
 	"github.com/prest/adapters"
 	"github.com/prest/adapters/scanner"
 	"github.com/prest/config"

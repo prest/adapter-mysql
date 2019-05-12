@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/joelmdesouza/mysql/internal/connection"
-	"github.com/joelmdesouza/mysql/statements"
 	"github.com/nuveo/log"
+	"github.com/prest/adapter-mysql/internal/connection"
+	"github.com/prest/adapter-mysql/statements"
 	"github.com/prest/adapters"
 	"github.com/prest/config"
 )

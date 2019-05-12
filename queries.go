@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	gotemplate "text/template"
 
-	"github.com/joelmdesouza/mysql/internal/connection"
 	"github.com/nuveo/log"
+	"github.com/prest/adapter-mysql/internal/connection"
 	"github.com/prest/adapters"
 	"github.com/prest/adapters/scanner"
 	"github.com/prest/config"
