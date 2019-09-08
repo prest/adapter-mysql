@@ -599,8 +599,19 @@ func (adapter *MySQL) Query(SQL string, params ...interface{}) (sc adapters.Scan
 		sc = &scanner.PrestScanner{Error: err}
 		return
 	}
+	sc = adapter.query(db, nil, SQL, params...)
+	return
+}
+
+func (adapter *MySQL) query(db *sqlx.DB, tx *sql.Tx, SQL string, params ...interface{}) (sc adapters.Scanner) {
 	log.Debugln("generated SQL:", SQL, " parameters: ", params)
-	p, err := Prepare(db, SQL)
+	var p *sql.Stmt
+	var err error
+	if tx != nil {
+		p, err = PrepareTx(tx, SQL)
+	} else {
+		p, err = Prepare(db, SQL)
+	}
 	if err != nil {
 		sc = &scanner.PrestScanner{Error: err}
 		return
@@ -716,8 +727,18 @@ func (adapter *MySQL) Insert(SQL string, params ...interface{}) (sc adapters.Sca
 		sc = &scanner.PrestScanner{Error: err}
 		return
 	}
-	//sc = adapter.insert(db, nil, SQL, params...)
-	sc = adapter.update(db, nil, SQL, params...)
+	sc = adapter.insert(db, nil, SQL, params...)
+	return
+}
+
+// InsertWithTransaction execute insert sql into a table
+func (adapter *MySQL) InsertWithTransaction(tx *sql.Tx, SQL string, params ...interface{}) (sc adapters.Scanner) {
+	sc = adapter.insert(nil, tx, SQL, params...)
+	return
+}
+
+func (adapter *MySQL) insert(db *sqlx.DB, tx *sql.Tx, SQL string, params ...interface{}) (sc adapters.Scanner) {
+	sc = adapter.update(db, tx, SQL, params...)
 	if sc.Err() != nil {
 		return
 	}
@@ -743,30 +764,7 @@ func (adapter *MySQL) Insert(SQL string, params ...interface{}) (sc adapters.Sca
 	sqlSelect = strings.Replace(sqlSelect, " ", "", -1)
 	sqlSelect = fmt.Sprint("SELECT * FROM ", sqlSelect, " WHERE ", whereSyntax)
 
-	return adapter.Query(sqlSelect, params...)
-}
-
-// InsertWithTransaction execute insert sql into a table
-func (adapter *MySQL) InsertWithTransaction(tx *sql.Tx, SQL string, params ...interface{}) (sc adapters.Scanner) {
-	sc = adapter.insert(nil, tx, SQL, params...)
-	return
-}
-
-func (adapter *MySQL) insert(db *sqlx.DB, tx *sql.Tx, SQL string, params ...interface{}) (sc adapters.Scanner) {
-	stmt, err := adapter.fullInsert(db, tx, SQL)
-	if err != nil {
-		log.Println(err)
-		sc = &scanner.PrestScanner{Error: err}
-		return
-	}
-	log.Debugln(SQL, " parameters: ", params)
-	var jsonData []byte
-	err = stmt.QueryRow(params...).Scan(&jsonData)
-	sc = &scanner.PrestScanner{
-		Error: err,
-		Buff:  bytes.NewBuffer(jsonData),
-	}
-	return
+	return adapter.query(db, tx, sqlSelect, params...)
 }
 
 // Delete execute delete sql into a table
