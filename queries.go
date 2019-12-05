@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	gotemplate "text/template"
 
@@ -46,7 +45,7 @@ func (adapter *MySQL) GetScript(verb, folder, scriptName string) (script string,
 
 // ParseScript use values sent by users and add on script
 func (adapter *MySQL) ParseScript(scriptPath string, queryURL url.Values) (sqlQuery string, values []interface{}, err error) {
-	_, tplName := path.Split(scriptPath)
+	_, tplName := filepath.Split(scriptPath)
 	q := make(map[string]interface{})
 	for key, value := range queryURL {
 		if len(value) == 1 {
